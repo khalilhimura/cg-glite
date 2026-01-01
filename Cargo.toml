@@ -1,0 +1,18 @@
+[package]
+name = "agentic-memory"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+graphlite-rust-sdk = "0.0.1"
+tokio = { version = "1.42", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.12", features = ["json"] }
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.11", features = ["v4", "serde"] }
+dotenv = "0.15"
+colored = "2.1"
+rustyline = "14.0"
