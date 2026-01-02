@@ -1,5 +1,7 @@
 # Architecture Deep Dive
 
+**Repository**: https://github.com/khalilhimura/cg-glite
+
 ## Overview
 
 The Agentic Memory System demonstrates the **Context Graph paradigm** - a novel approach to AI agent memory that goes beyond traditional vector-based RAG systems.

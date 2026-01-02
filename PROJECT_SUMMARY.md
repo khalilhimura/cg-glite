@@ -4,6 +4,8 @@
 
 A complete, production-ready sample application demonstrating **GraphLite** for Agentic AI using the **Context Graph paradigm**. This showcases the most impactful use case: an AI assistant with persistent, queryable memory that maintains relationships between entities.
 
+**Repository**: https://github.com/khalilhimura/cg-glite
+
 ## Key Innovation: Context Graph vs. Traditional RAG
 
 Traditional vector-based RAG systems find "similar" content but lose relationships. This system:
@@ -26,25 +28,25 @@ agentic-memory/
 ├── .env.example                # Environment variable template
 │
 └── src/
-    ├── main.rs                 # CLI entry point and interactive REPL (175 lines)
+    ├── main.rs                 # CLI entry point and interactive REPL (222 lines)
     │
-    ├── graph/                  # Graph database layer
-    │   ├── mod.rs              # Module exports
-    │   ├── schema.rs           # Entity definitions and graph schema (96 lines)
-    │   └── operations.rs       # GraphLite operations and GQL queries (184 lines)
+    ├── graph/                  # Graph database layer (335 lines)
+    │   ├── mod.rs              # Module exports (5 lines)
+    │   ├── schema.rs           # Entity definitions and graph schema (106 lines)
+    │   └── operations.rs       # GraphLite operations and GQL queries (224 lines)
     │
-    ├── llm/                    # LLM integration layer
-    │   ├── mod.rs              # Module exports
-    │   ├── client.rs           # API clients for Anthropic/OpenAI (156 lines)
-    │   └── extraction.rs       # Entity extraction logic (98 lines)
+    ├── llm/                    # LLM integration layer (336 lines)
+    │   ├── mod.rs              # Module exports (5 lines)
+    │   ├── client.rs           # API clients for Anthropic/OpenAI (190 lines)
+    │   └── extraction.rs       # Entity extraction logic (141 lines)
     │
-    └── agent/                  # Agentic orchestration layer
-        ├── mod.rs              # Module exports
-        ├── memory.rs           # Memory management and context building (126 lines)
-        └── retrieval.rs        # Context retrieval strategies (44 lines)
+    └── agent/                  # Agentic orchestration layer (258 lines)
+        ├── mod.rs              # Module exports (5 lines)
+        ├── memory.rs           # Memory management and context building (192 lines)
+        └── retrieval.rs        # Context retrieval strategies (61 lines)
 ```
 
-**Total**: ~880 lines of well-documented Rust code + comprehensive documentation
+**Total**: ~1,151 lines of well-documented Rust code + comprehensive documentation
 
 ## Architecture Overview
 
@@ -325,17 +327,17 @@ Created Files (20 files):
 │   ├── .env.example            0.5 KB
 │   └── .gitignore              0.1 KB
 │
-└── Source Code (10 files, ~880 lines)
-    ├── src/main.rs             175 lines
+└── Source Code (10 files, 1,151 lines)
+    ├── src/main.rs             222 lines
     ├── src/graph/mod.rs          5 lines
-    ├── src/graph/schema.rs      96 lines
-    ├── src/graph/operations.rs 184 lines
+    ├── src/graph/schema.rs     106 lines
+    ├── src/graph/operations.rs 224 lines
     ├── src/llm/mod.rs            5 lines
-    ├── src/llm/client.rs       156 lines
-    ├── src/llm/extraction.rs    98 lines
+    ├── src/llm/client.rs       190 lines
+    ├── src/llm/extraction.rs   141 lines
     ├── src/agent/mod.rs          5 lines
-    ├── src/agent/memory.rs     126 lines
-    └── src/agent/retrieval.rs   44 lines
+    ├── src/agent/memory.rs     192 lines
+    └── src/agent/retrieval.rs   61 lines
 ```
 
 ## License

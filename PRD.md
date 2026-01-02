@@ -1,5 +1,7 @@
 # Product Requirements Document: Agentic Memory with Context Graph
 
+**Repository**: https://github.com/khalilhimura/cg-glite
+
 ## Overview
 
 A sample application demonstrating GraphLite's capability to power next-generation AI agents through persistent context graphs. This showcases how embedded graph databases enable agents to maintain rich, queryable memory that goes beyond traditional vector-based RAG systems.

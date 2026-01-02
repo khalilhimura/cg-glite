@@ -2,7 +2,15 @@
 
 Get the Agentic Memory System running in 5 minutes!
 
-## Step 1: Prerequisites
+**Repository**: https://github.com/khalilhimura/cg-glite
+
+## Step 1: Clone and Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/khalilhimura/cg-glite.git
+cd cg-glite
+```
 
 Make sure you have:
 - ✅ Rust installed (check with `rustc --version`)

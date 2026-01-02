@@ -2,6 +2,8 @@
 
 > An AI assistant with persistent context graph memory powered by GraphLite
 
+**Repository**: https://github.com/khalilhimura/cg-glite
+
 This is a sample application demonstrating how [GraphLite](https://github.com/GraphLite-AI/GraphLite) enables next-generation AI agents through the **Context Graph paradigm**. Unlike traditional vector-based RAG systems, this agent maintains rich, queryable relationships between entities, enabling deeper understanding and more intelligent context retrieval.
 
 ## What is a Context Graph?
@@ -65,7 +67,8 @@ This enables agents to:
 
 1. Clone this repository:
 ```bash
-cd kg  # or your project directory
+git clone https://github.com/khalilhimura/cg-glite.git
+cd cg-glite
 ```
 
 2. Copy the example environment file and configure it:
@@ -307,7 +310,7 @@ MIT License - feel free to use this code for your own projects.
 ## Support
 
 For issues related to:
-- **This sample app**: Open an issue in this repository
+- **This sample app**: Open an issue at https://github.com/khalilhimura/cg-glite/issues
 - **GraphLite**: Visit the [GraphLite repository](https://github.com/GraphLite-AI/GraphLite)
 - **LLM APIs**: Check Anthropic or OpenAI documentation
 
