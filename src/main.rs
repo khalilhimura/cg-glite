@@ -132,7 +132,7 @@ async fn main() -> Result<()> {
 /// Process a user message and generate a response
 async fn process_message(
     memory: &AgenticMemory,
-    session: &graphlite_rust_sdk::Session,
+    session: &graphlite_sdk::Session,
     message: &str,
 ) -> Result<String> {
     // Show thinking indicator

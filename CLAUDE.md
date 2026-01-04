@@ -124,12 +124,12 @@ See `src/llm/extraction.rs` for the extraction prompt template.
 
 ### Session Management
 
-GraphLite requires username/password per session:
+GraphLite SDK creates sessions with username:
 ```rust
-let session = graph_db.session("admin", "admin123")?;
+let session = graph_db.session("admin")?;
 ```
 
-Sessions are used for all queries/mutations. Default credentials are in `.env`.
+Sessions are used for all queries/mutations. The username is specified via command-line arguments or defaults to "admin".
 
 ## Common Patterns
 
@@ -180,12 +180,13 @@ Use in `src/agent/memory.rs::build_context()` to enrich context.
 
 ## GraphLite Specifics
 
-- **Installation**: `GraphLite::install(path, user, pass)` creates new DB
-- **Opening**: `GraphLite::open(path)` opens existing DB
-- **Queries**: `session.execute(gql_string)` returns `QueryResult`
+- **Opening/Creating**: `GraphLite::open(path)` opens or creates a database
+- **Sessions**: `db.session(username)` creates a session for a user (no password required in SDK)
+- **Queries**: `session.query(gql_string)` returns `QueryResult`
+- **Execution**: `session.execute(gql_string)` runs statements without returning results
 - **Result Parsing**: Currently basic string parsing; may need enhancement based on GraphLite SDK updates
 
-**Note**: GraphLite is embedded like SQLite - no separate server process. Database is a single file.
+**Note**: GraphLite is embedded like SQLite - no separate server process. Database is a single directory.
 
 ## LLM Provider Configuration
 

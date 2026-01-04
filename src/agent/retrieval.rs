@@ -1,5 +1,5 @@
 use anyhow::Result;
-use graphlite_rust_sdk::Session;
+use graphlite_sdk::Session;
 use crate::graph::GraphDB;
 
 /// Context retrieval strategies for the agent

@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use graphlite_rust_sdk::{GraphLite, Session};
+use graphlite_sdk::{GraphLite, Session};
 use std::path::Path;
 use super::schema::{Conversation, Message, Person, Topic, ExtractedEntities, new_id, now};
 
@@ -10,16 +10,8 @@ pub struct GraphDB {
 
 impl GraphDB {
     /// Initialize a new GraphLite database
-    pub async fn new(db_path: &str, admin_user: &str, admin_password: &str) -> Result<Self> {
-        // Check if database exists, if not install it
-        let path = Path::new(db_path);
-        if !path.exists() {
-            println!("Initializing new GraphLite database at {}...", db_path);
-            GraphLite::install(db_path, admin_user, admin_password)
-                .context("Failed to install GraphLite database")?;
-        }
-
-        // Open the database
+    pub async fn new(db_path: &str, _admin_user: &str, _admin_password: &str) -> Result<Self> {
+        // Open the database (creates it if it doesn't exist)
         let db = GraphLite::open(db_path)
             .context("Failed to open GraphLite database")?;
 
@@ -27,8 +19,8 @@ impl GraphDB {
     }
 
     /// Create a new session
-    pub fn session(&self, username: &str, password: &str) -> Result<Session> {
-        self.db.session(username, password)
+    pub fn session(&self, username: &str, _password: &str) -> Result<Session> {
+        self.db.session(username)
             .context("Failed to create database session")
     }
 

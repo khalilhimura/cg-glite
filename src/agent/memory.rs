@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use crate::graph::{GraphDB, ExtractedEntities};
 use crate::llm::{LLMClient, EntityExtractor};
-use graphlite_rust_sdk::Session;
+use graphlite_sdk::Session;
 
 /// Agentic memory manager
 /// Orchestrates conversation storage, entity extraction, and context building
