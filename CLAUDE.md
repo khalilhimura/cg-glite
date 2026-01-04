@@ -42,9 +42,13 @@ cargo test test_name
 ### Environment Setup
 
 1. Copy `.env.example` to `.env`
-2. Set `LLM_PROVIDER` (anthropic or openai)
-3. Add corresponding API key (`ANTHROPIC_API_KEY` or `OPENAI_API_KEY`)
-4. Set `LLM_MODEL` (e.g., `claude-3-5-sonnet-20241022`)
+2. Set `LLM_PROVIDER` (anthropic, openai, or openrouter)
+3. Add corresponding API key:
+   - `ANTHROPIC_API_KEY` for Anthropic
+   - `OPENAI_API_KEY` for OpenAI
+   - `OPENROUTER_API_KEY` for OpenRouter
+4. Set `LLM_MODEL` (e.g., `claude-3-5-sonnet-20241022` for Anthropic, `anthropic/claude-3.5-sonnet` for OpenRouter)
+5. (Optional) For OpenRouter: Set `OPENROUTER_APP_NAME` and `OPENROUTER_SITE_URL` for app tracking
 
 ## Architecture
 
@@ -56,7 +60,7 @@ cargo test test_name
    - Uses GraphLite embedded database (no server needed)
 
 2. **LLM Layer** (`src/llm/`):
-   - `client.rs`: Unified client for Anthropic/OpenAI APIs
+   - `client.rs`: Unified client for Anthropic/OpenAI/OpenRouter APIs
    - `extraction.rs`: Structured entity extraction from user messages
    - Returns JSON with `{people: [], topics: [], tasks: [], documents: []}`
 
@@ -185,16 +189,31 @@ Use in `src/agent/memory.rs::build_context()` to enrich context.
 
 ## LLM Provider Configuration
 
-The `LLMClient` abstracts Anthropic and OpenAI:
+The `LLMClient` abstracts multiple LLM providers:
 
 ```rust
 match provider {
     LLMProvider::Anthropic => // Use Anthropic API format
     LLMProvider::OpenAI => // Use OpenAI API format
+    LLMProvider::OpenRouter => // Use OpenRouter API (OpenAI-compatible)
 }
 ```
 
-Both providers return text responses. Entity extraction expects JSON in response body.
+All providers return text responses. Entity extraction expects JSON in response body.
+
+### OpenRouter Integration
+
+OpenRouter provides unified access to multiple LLM providers through a single API. Key features:
+
+- **Endpoint**: `https://openrouter.ai/api/v1/chat/completions`
+- **Authentication**: Bearer token in `Authorization` header
+- **Optional Headers**:
+  - `HTTP-Referer`: Your site URL (for app rankings on openrouter.ai)
+  - `X-Title`: Your app name (for identification)
+- **API Format**: OpenAI-compatible request/response structure
+- **Model Selection**: Specify any supported model in the request (e.g., `anthropic/claude-3.5-sonnet`, `openai/gpt-4`, `google/gemini-pro`)
+
+This allows switching between different LLM providers (Claude, GPT, Gemini, etc.) without code changes - just update the model name in configuration.
 
 ## Testing Strategy
 

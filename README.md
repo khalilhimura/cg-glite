@@ -28,7 +28,7 @@ This enables agents to:
 - **Context-Aware Responses**: Agent retrieves relevant context from graph before responding
 - **Interactive CLI**: Beautiful terminal interface with entity highlighting
 - **Privacy-First**: All data stored locally, no external memory services
-- **Flexible LLM Support**: Works with OpenAI or Anthropic APIs
+- **Flexible LLM Support**: Works with Anthropic, OpenAI, or OpenRouter (access to 200+ models)
 
 ## Architecture
 
@@ -59,9 +59,10 @@ This enables agents to:
 
 - Rust 1.70 or higher
 - Cargo (comes with Rust)
-- API key for either:
-  - Anthropic Claude API, or
+- API key for one of:
+  - Anthropic Claude API
   - OpenAI API
+  - OpenRouter API (unified access to 200+ models from multiple providers)
 
 ## Installation
 
@@ -87,6 +88,13 @@ LLM_MODEL=claude-3-5-sonnet-20241022
 # LLM_PROVIDER=openai
 # OPENAI_API_KEY=your_api_key_here
 # LLM_MODEL=gpt-4-turbo-preview
+
+# Or for OpenRouter (access to 200+ models)
+# LLM_PROVIDER=openrouter
+# OPENROUTER_API_KEY=your_api_key_here
+# LLM_MODEL=anthropic/claude-3.5-sonnet
+# OPENROUTER_APP_NAME=MyApp  # Optional: for app tracking
+# OPENROUTER_SITE_URL=https://myapp.com  # Optional: for app ranking
 ```
 
 4. Build the project:
@@ -300,6 +308,7 @@ MIT License - feel free to use this code for your own projects.
 - [GraphLite](https://github.com/GraphLite-AI/GraphLite) - Embedded graph database
 - [Anthropic](https://anthropic.com) - Claude AI API
 - [OpenAI](https://openai.com) - GPT API
+- [OpenRouter](https://openrouter.ai) - Unified LLM API with access to 200+ models
 
 ## Related Resources
 

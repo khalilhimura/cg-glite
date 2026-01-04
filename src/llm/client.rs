@@ -8,6 +8,12 @@ use serde_json::json;
 pub enum LLMProvider {
     OpenAI { api_key: String, model: String },
     Anthropic { api_key: String, model: String },
+    OpenRouter {
+        api_key: String,
+        model: String,
+        app_name: Option<String>,
+        site_url: Option<String>,
+    },
 }
 
 /// LLM client for making API calls
@@ -81,6 +87,10 @@ impl LLMClient {
             }
             LLMProvider::OpenAI { api_key, model } => {
                 self.openai_complete(api_key, model, system, user_message)
+                    .await
+            }
+            LLMProvider::OpenRouter { api_key, model, app_name, site_url } => {
+                self.openrouter_complete(api_key, model, app_name.as_deref(), site_url.as_deref(), system, user_message)
                     .await
             }
         }
@@ -182,6 +192,70 @@ impl LLMClient {
             .context("Failed to parse OpenAI response")?;
 
         Ok(openai_response
+            .choices
+            .first()
+            .map(|c| c.message.content.clone())
+            .unwrap_or_default())
+    }
+
+    /// OpenRouter API completion (OpenAI-compatible format)
+    async fn openrouter_complete(
+        &self,
+        api_key: &str,
+        model: &str,
+        app_name: Option<&str>,
+        site_url: Option<&str>,
+        system: &str,
+        user_message: &str,
+    ) -> Result<String> {
+        let url = "https://openrouter.ai/api/v1/chat/completions";
+
+        let request_body = OpenAIRequest {
+            model: model.to_string(),
+            temperature: 0.7,
+            messages: vec![
+                OpenAIMessage {
+                    role: "system".to_string(),
+                    content: system.to_string(),
+                },
+                OpenAIMessage {
+                    role: "user".to_string(),
+                    content: user_message.to_string(),
+                },
+            ],
+        };
+
+        let mut request = self
+            .http_client
+            .post(url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .header("content-type", "application/json");
+
+        // Add optional headers for app tracking
+        if let Some(name) = app_name {
+            request = request.header("X-Title", name);
+        }
+        if let Some(url) = site_url {
+            request = request.header("HTTP-Referer", url);
+        }
+
+        let response = request
+            .json(&request_body)
+            .send()
+            .await
+            .context("Failed to send request to OpenRouter API")?;
+
+        let status = response.status();
+        let response_text = response.text().await?;
+
+        if !status.is_success() {
+            anyhow::bail!("OpenRouter API error ({}): {}", status, response_text);
+        }
+
+        let openrouter_response: OpenAIResponse = serde_json::from_str(&response_text)
+            .context("Failed to parse OpenRouter response")?;
+
+        Ok(openrouter_response
             .choices
             .first()
             .map(|c| c.message.content.clone())

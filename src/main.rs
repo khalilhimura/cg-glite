@@ -200,8 +200,26 @@ fn create_llm_client() -> Result<LLMClient> {
 
             LLMProvider::OpenAI { api_key, model }
         }
+        "openrouter" => {
+            let api_key = env::var("OPENROUTER_API_KEY")
+                .context("OPENROUTER_API_KEY not set in environment")?;
+            let model = env::var("LLM_MODEL")
+                .unwrap_or_else(|_| "anthropic/claude-3.5-sonnet".to_string());
+            let app_name = env::var("OPENROUTER_APP_NAME").ok();
+            let site_url = env::var("OPENROUTER_SITE_URL").ok();
+
+            LLMProvider::OpenRouter {
+                api_key,
+                model,
+                app_name,
+                site_url,
+            }
+        }
         _ => {
-            anyhow::bail!("Unknown LLM_PROVIDER: {}. Use 'anthropic' or 'openai'", provider_name);
+            anyhow::bail!(
+                "Unknown LLM_PROVIDER: {}. Use 'anthropic', 'openai', or 'openrouter'",
+                provider_name
+            );
         }
     };
 
