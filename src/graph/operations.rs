@@ -309,11 +309,53 @@ impl GraphDB {
         Ok(entities)
     }
 
-    /// Escape single quotes in strings for GQL queries
+    /// Escape special characters in strings for safe use in GQL queries
+    ///
+    /// Escapes characters that could break string context or cause injection:
+    /// - Single quotes (') -> \'
+    /// - Backslashes (\) -> \\
+    /// - Newlines (\n) -> \n
+    /// - Carriage returns (\r) -> \r
+    /// - Tabs (\t) -> \t
+    /// - Backspace (\b) -> \b
+    /// - Form feed (\f) -> \f
+    /// - NULL (\0) -> \0
+    /// - Double quotes (") -> \"
+    ///
+    /// # Arguments
+    /// * `s` - The string to escape
+    ///
+    /// # Returns
+    /// * Escaped string safe for GQL query interpolation
+    ///
+    /// # Security
+    /// This function prevents GQL injection by ensuring user input cannot
+    /// break out of string context in queries.
+    ///
+    /// # Example
+    /// ```
+    /// let escaped = GraphDB::escape_string("O'Reilly\nNewline");
+    /// // Returns: "O\\'Reilly\\nNewline"
+    /// ```
     fn escape_string(s: &str) -> String {
-        s.replace('\'', "\\'")
-            .replace('\n', "\\n")
-            .replace('\r', "\\r")
+        let mut result = String::with_capacity(s.len() + 16);
+
+        for ch in s.chars() {
+            match ch {
+                '\'' => result.push_str("\\'"),   // Single quote
+                '\\' => result.push_str("\\\\"),  // Backslash
+                '\n' => result.push_str("\\n"),   // Newline
+                '\r' => result.push_str("\\r"),   // Carriage return
+                '\t' => result.push_str("\\t"),   // Tab
+                '\x08' => result.push_str("\\b"), // Backspace
+                '\x0C' => result.push_str("\\f"), // Form feed
+                '\0' => result.push_str("\\0"),   // NULL character
+                '"' => result.push_str("\\\""),   // Double quote
+                _ => result.push(ch),
+            }
+        }
+
+        result
     }
 }
 
@@ -373,7 +415,83 @@ mod tests {
     async fn test_escape_string() {
         let input = "It's a test with 'quotes' and\nnewlines";
         let escaped = GraphDB::escape_string(input);
+
+        // Verify each escape sequence
         assert!(escaped.contains("\\'"));
+        assert!(escaped.contains("\\n"));
+    }
+
+    #[test]
+    fn test_escape_string_backslash() {
+        let input = "path\\to\\file";
+        let escaped = GraphDB::escape_string(input);
+        assert_eq!(escaped, "path\\\\to\\\\file");
+    }
+
+    #[test]
+    fn test_escape_string_comprehensive() {
+        let input = "Test\twith\ttabs\nand\nnewlines\r\nand\rcarriage\x08backspace\x0Cformfeed";
+        let escaped = GraphDB::escape_string(input);
+
+        assert!(escaped.contains("\\t"), "Tab should be escaped");
+        assert!(escaped.contains("\\n"), "Newline should be escaped");
+        assert!(escaped.contains("\\r"), "Carriage return should be escaped");
+        assert!(escaped.contains("\\b"), "Backspace should be escaped");
+        assert!(escaped.contains("\\f"), "Form feed should be escaped");
+    }
+
+    #[test]
+    fn test_escape_string_injection_prevention() {
+        // Simulated injection attempt
+        let input = "'; DROP TABLE users; --";
+        let escaped = GraphDB::escape_string(input);
+
+        // Verify quotes are escaped (prevents breaking out of string context)
+        assert!(escaped.contains("\\'"), "Quotes should be escaped");
+        assert!(escaped.starts_with("\\'"), "Should start with escaped quote");
+    }
+
+    #[test]
+    fn test_escape_string_null_character() {
+        let input = "text\0with\0nulls";
+        let escaped = GraphDB::escape_string(input);
+        assert!(escaped.contains("\\0"), "NULL characters should be escaped");
+    }
+
+    #[test]
+    fn test_escape_string_edge_cases() {
+        // Empty string
+        assert_eq!(GraphDB::escape_string(""), "");
+
+        // Only special characters
+        assert_eq!(GraphDB::escape_string("'\n\r\t"), "\\'\\n\\r\\t");
+
+        // Unicode (should pass through)
+        let unicode = "Hello 世界 🌍";
+        let escaped = GraphDB::escape_string(unicode);
+        assert!(escaped.contains("世界"));
+        assert!(escaped.contains("🌍"));
+    }
+
+    #[test]
+    fn test_escape_string_double_quote() {
+        let input = "String with \"double quotes\"";
+        let escaped = GraphDB::escape_string(input);
+        assert!(escaped.contains("\\\""), "Double quotes should be escaped");
+    }
+
+    #[test]
+    fn test_escape_string_backslash_before_quote() {
+        // Critical test: backslash before quote should escape both
+        let input = "O'Reilly\\'; malicious";
+        let escaped = GraphDB::escape_string(input);
+
+        // Both backslash and quote should be escaped
+        assert!(escaped.contains("\\\\"), "Backslash should be escaped");
+        assert!(escaped.contains("\\'"), "Quote should be escaped");
+
+        // Verify the backslash doesn't neutralize the quote escape
+        assert!(escaped.contains("O\\'Reilly\\\\"), "Should have escaped quote then escaped backslash");
     }
 
     // Note: Query result parsing tests (get_conversation_messages, find_related_entities)
