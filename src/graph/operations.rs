@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use graphlite_sdk::{GraphLite, Session};
+use graphlite_sdk::{GraphLite, Session, Value};
 use std::path::Path;
 use super::schema::{Conversation, Message, Person, Topic, ExtractedEntities, new_id, now};
 
@@ -213,6 +213,18 @@ impl GraphDB {
     }
 
     /// Query recent messages from a conversation
+    ///
+    /// Returns messages as (role, content, timestamp) tuples ordered by timestamp DESC.
+    /// Filters out rows with missing or incorrect value types.
+    ///
+    /// # Arguments
+    /// * `session` - Active GraphLite session
+    /// * `conversation_id` - UUID of the conversation
+    /// * `limit` - Maximum number of messages to return
+    ///
+    /// # Returns
+    /// * `Ok(Vec<(String, String, String)>)` - Vector of (role, content, timestamp) tuples
+    /// * `Err(_)` - Query execution or parsing error
     pub fn get_conversation_messages(
         &self,
         session: &Session,
@@ -229,14 +241,40 @@ impl GraphDB {
 
         let result = session.query(&query)?;
 
-        // Parse result (this is simplified - actual GraphLite result parsing may differ)
-        // For now, return empty vec as we need to check actual GraphLite API
-        let messages = Vec::new();
+        // Parse result rows into (role, content, timestamp) tuples
+        let messages: Vec<(String, String, String)> = result
+            .rows
+            .iter()
+            .filter_map(|row| {
+                match (
+                    row.get_value("m.role"),
+                    row.get_value("m.content"),
+                    row.get_value("m.timestamp"),
+                ) {
+                    (Some(Value::String(role)), Some(Value::String(content)), Some(Value::String(ts))) => {
+                        Some((role.clone(), content.clone(), ts.clone()))
+                    }
+                    _ => None, // Skip rows with missing or wrong-typed values
+                }
+            })
+            .collect();
 
         Ok(messages)
     }
 
     /// Find entities mentioned in conversations about a topic
+    ///
+    /// Returns both People (by name) and Tasks (by description) that are mentioned
+    /// in the same messages as the specified topic. Uses a CASE statement to handle
+    /// different property names for different entity types.
+    ///
+    /// # Arguments
+    /// * `session` - Active GraphLite session
+    /// * `topic_name` - Name of the topic to search for
+    ///
+    /// # Returns
+    /// * `Ok(Vec<String>)` - Vector of entity names/descriptions
+    /// * `Err(_)` - Query execution or parsing error
     pub fn find_related_entities(
         &self,
         session: &Session,
@@ -245,14 +283,28 @@ impl GraphDB {
         let query = format!(
             "MATCH (t:Topic {{name: '{}'}})-[:MENTIONED_IN]->(m:Message)<-[:MENTIONED_IN]-(e) \
              WHERE e:Person OR e:Task \
-             RETURN DISTINCT e.name",
+             RETURN DISTINCT \
+               CASE \
+                 WHEN e:Person THEN e.name \
+                 WHEN e:Topic THEN e.name \
+                 WHEN e:Task THEN e.description \
+               END as entity_name",
             Self::escape_string(topic_name)
         );
 
         let result = session.query(&query)?;
 
-        // Parse and return entities
-        let entities = Vec::new();
+        // Parse result rows to extract entity names/descriptions
+        let entities: Vec<String> = result
+            .rows
+            .iter()
+            .filter_map(|row| {
+                match row.get_value("entity_name") {
+                    Some(Value::String(name)) => Some(name.clone()),
+                    _ => None, // Skip rows with missing or wrong-typed values
+                }
+            })
+            .collect();
 
         Ok(entities)
     }
@@ -323,4 +375,17 @@ mod tests {
         let escaped = GraphDB::escape_string(input);
         assert!(escaped.contains("\\'"));
     }
+
+    // Note: Query result parsing tests (get_conversation_messages, find_related_entities)
+    // require integration testing with a real GraphLite database instance.
+    // These functions:
+    // - Parse QueryResult.rows using row.get_value(column_name)
+    // - Match on Value::String variants
+    // - Use filter_map to skip rows with missing/wrong-typed values
+    // - Return empty Vec when no results match
+    //
+    // Manual testing should verify:
+    // 1. Column names match RETURN clause (e.g., "m.role", "entity_name")
+    // 2. Messages are ordered DESC by timestamp
+    // 3. CASE statement correctly handles Person (name) vs Task (description)
 }
