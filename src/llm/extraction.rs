@@ -53,6 +53,18 @@ Return ONLY the JSON object, no additional text."#;
         Ok(entities)
     }
 
+    /// Extract a string array from a JSON value, returning empty vec if not present
+    fn extract_string_array(value: &serde_json::Value, field_name: &str) -> Vec<String> {
+        value[field_name]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     /// Parse the LLM's extraction response
     fn parse_extraction_response(&self, response: &str) -> Result<ExtractedEntities> {
         // Try to extract JSON from the response (handle cases where LLM adds extra text)
@@ -70,41 +82,10 @@ Return ONLY the JSON object, no additional text."#;
             .context("Failed to parse entity extraction JSON")?;
 
         let entities = ExtractedEntities {
-            people: parsed["people"]
-                .as_array()
-                .map(|arr| {
-                    arr.iter()
-                        .filter_map(|v| v.as_str().map(String::from))
-                        .collect()
-                })
-                .unwrap_or_default(),
-
-            topics: parsed["topics"]
-                .as_array()
-                .map(|arr| {
-                    arr.iter()
-                        .filter_map(|v| v.as_str().map(String::from))
-                        .collect()
-                })
-                .unwrap_or_default(),
-
-            tasks: parsed["tasks"]
-                .as_array()
-                .map(|arr| {
-                    arr.iter()
-                        .filter_map(|v| v.as_str().map(String::from))
-                        .collect()
-                })
-                .unwrap_or_default(),
-
-            documents: parsed["documents"]
-                .as_array()
-                .map(|arr| {
-                    arr.iter()
-                        .filter_map(|v| v.as_str().map(String::from))
-                        .collect()
-                })
-                .unwrap_or_default(),
+            people: Self::extract_string_array(&parsed, "people"),
+            topics: Self::extract_string_array(&parsed, "topics"),
+            tasks: Self::extract_string_array(&parsed, "tasks"),
+            documents: Self::extract_string_array(&parsed, "documents"),
         };
 
         Ok(entities)
@@ -114,6 +95,51 @@ Return ONLY the JSON object, no additional text."#;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_extract_string_array() {
+        let json = json!({
+            "field": ["a", "b", "c"]
+        });
+        let result = EntityExtractor::extract_string_array(&json, "field");
+        assert_eq!(result, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn test_extract_string_array_missing_field() {
+        let json = json!({});
+        let result = EntityExtractor::extract_string_array(&json, "field");
+        assert_eq!(result, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_extract_string_array_null_value() {
+        let json = json!({
+            "field": null
+        });
+        let result = EntityExtractor::extract_string_array(&json, "field");
+        assert_eq!(result, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_extract_string_array_empty_array() {
+        let json = json!({
+            "field": []
+        });
+        let result = EntityExtractor::extract_string_array(&json, "field");
+        assert_eq!(result, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_extract_string_array_mixed_types() {
+        let json = json!({
+            "field": ["string", 123, true, null, "another"]
+        });
+        let result = EntityExtractor::extract_string_array(&json, "field");
+        // Should only extract string values
+        assert_eq!(result, vec!["string", "another"]);
+    }
 
     #[test]
     fn test_parse_extraction_response() {

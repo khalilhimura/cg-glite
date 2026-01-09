@@ -69,6 +69,68 @@ struct OpenAIChoice {
     message: OpenAIMessage,
 }
 
+/// Common structure for LLM API requests
+struct LLMRequest {
+    url: String,
+    headers: Vec<(String, String)>,
+    body: serde_json::Value,
+}
+
+impl LLMRequest {
+    fn new(url: impl Into<String>) -> Self {
+        Self {
+            url: url.into(),
+            headers: Vec::new(),
+            body: json!({}),
+        }
+    }
+
+    fn header(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.headers.push((key.into(), value.into()));
+        self
+    }
+
+    fn body(mut self, body: serde_json::Value) -> Self {
+        self.body = body;
+        self
+    }
+}
+
+/// Trait for provider-specific response parsing
+trait ResponseParser {
+    fn parse_completion(&self, response_text: &str) -> Result<String>;
+}
+
+/// Anthropic response parser
+struct AnthropicParser;
+
+impl ResponseParser for AnthropicParser {
+    fn parse_completion(&self, response_text: &str) -> Result<String> {
+        let response: AnthropicResponse = serde_json::from_str(response_text)
+            .context("Failed to parse Anthropic response")?;
+        Ok(response
+            .content
+            .first()
+            .map(|c| c.text.clone())
+            .unwrap_or_default())
+    }
+}
+
+/// OpenAI response parser (also used for OpenRouter)
+struct OpenAIParser;
+
+impl ResponseParser for OpenAIParser {
+    fn parse_completion(&self, response_text: &str) -> Result<String> {
+        let response: OpenAIResponse = serde_json::from_str(response_text)
+            .context("Failed to parse OpenAI response")?;
+        Ok(response
+            .choices
+            .first()
+            .map(|c| c.message.content.clone())
+            .unwrap_or_default())
+    }
+}
+
 impl LLMClient {
     /// Create a new LLM client
     pub fn new(provider: LLMProvider) -> Self {
@@ -96,6 +158,42 @@ impl LLMClient {
         }
     }
 
+    /// Execute an LLM request and parse the response
+    async fn execute_request(
+        &self,
+        request: LLMRequest,
+        parser: &dyn ResponseParser,
+        provider_name: &str,
+    ) -> Result<String> {
+        let mut http_request = self
+            .http_client
+            .post(&request.url)
+            .header("content-type", "application/json");
+
+        // Add custom headers
+        for (key, value) in request.headers {
+            http_request = http_request.header(key, value);
+        }
+
+        // Send request
+        let response = http_request
+            .json(&request.body)
+            .send()
+            .await
+            .context(format!("Failed to send request to {} API", provider_name))?;
+
+        // Check status
+        let status = response.status();
+        let response_text = response.text().await?;
+
+        if !status.is_success() {
+            anyhow::bail!("{} API error ({}): {}", provider_name, status, response_text);
+        }
+
+        // Parse response
+        parser.parse_completion(&response_text)
+    }
+
     /// Anthropic API completion
     async fn anthropic_complete(
         &self,
@@ -104,46 +202,23 @@ impl LLMClient {
         system: &str,
         user_message: &str,
     ) -> Result<String> {
-        let url = "https://api.anthropic.com/v1/messages";
-
-        let request_body = json!({
-            "model": model,
-            "max_tokens": 4096,
-            "system": system,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": user_message
-                }
-            ]
-        });
-
-        let response = self
-            .http_client
-            .post(url)
+        let request = LLMRequest::new("https://api.anthropic.com/v1/messages")
             .header("x-api-key", api_key)
             .header("anthropic-version", "2023-06-01")
-            .header("content-type", "application/json")
-            .json(&request_body)
-            .send()
+            .body(json!({
+                "model": model,
+                "max_tokens": 4096,
+                "system": system,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": user_message
+                    }
+                ]
+            }));
+
+        self.execute_request(request, &AnthropicParser, "Anthropic")
             .await
-            .context("Failed to send request to Anthropic API")?;
-
-        let status = response.status();
-        let response_text = response.text().await?;
-
-        if !status.is_success() {
-            anyhow::bail!("Anthropic API error ({}): {}", status, response_text);
-        }
-
-        let anthropic_response: AnthropicResponse = serde_json::from_str(&response_text)
-            .context("Failed to parse Anthropic response")?;
-
-        Ok(anthropic_response
-            .content
-            .first()
-            .map(|c| c.text.clone())
-            .unwrap_or_default())
     }
 
     /// OpenAI API completion
@@ -154,48 +229,25 @@ impl LLMClient {
         system: &str,
         user_message: &str,
     ) -> Result<String> {
-        let url = "https://api.openai.com/v1/chat/completions";
-
-        let request_body = OpenAIRequest {
-            model: model.to_string(),
-            temperature: 0.7,
-            messages: vec![
-                OpenAIMessage {
-                    role: "system".to_string(),
-                    content: system.to_string(),
-                },
-                OpenAIMessage {
-                    role: "user".to_string(),
-                    content: user_message.to_string(),
-                },
-            ],
-        };
-
-        let response = self
-            .http_client
-            .post(url)
+        let request = LLMRequest::new("https://api.openai.com/v1/chat/completions")
             .header("Authorization", format!("Bearer {}", api_key))
-            .header("content-type", "application/json")
-            .json(&request_body)
-            .send()
+            .body(json!({
+                "model": model,
+                "temperature": 0.7,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": system
+                    },
+                    {
+                        "role": "user",
+                        "content": user_message
+                    }
+                ]
+            }));
+
+        self.execute_request(request, &OpenAIParser, "OpenAI")
             .await
-            .context("Failed to send request to OpenAI API")?;
-
-        let status = response.status();
-        let response_text = response.text().await?;
-
-        if !status.is_success() {
-            anyhow::bail!("OpenAI API error ({}): {}", status, response_text);
-        }
-
-        let openai_response: OpenAIResponse = serde_json::from_str(&response_text)
-            .context("Failed to parse OpenAI response")?;
-
-        Ok(openai_response
-            .choices
-            .first()
-            .map(|c| c.message.content.clone())
-            .unwrap_or_default())
     }
 
     /// OpenRouter API completion (OpenAI-compatible format)
@@ -208,28 +260,22 @@ impl LLMClient {
         system: &str,
         user_message: &str,
     ) -> Result<String> {
-        let url = "https://openrouter.ai/api/v1/chat/completions";
-
-        let request_body = OpenAIRequest {
-            model: model.to_string(),
-            temperature: 0.7,
-            messages: vec![
-                OpenAIMessage {
-                    role: "system".to_string(),
-                    content: system.to_string(),
-                },
-                OpenAIMessage {
-                    role: "user".to_string(),
-                    content: user_message.to_string(),
-                },
-            ],
-        };
-
-        let mut request = self
-            .http_client
-            .post(url)
+        let mut request = LLMRequest::new("https://openrouter.ai/api/v1/chat/completions")
             .header("Authorization", format!("Bearer {}", api_key))
-            .header("content-type", "application/json");
+            .body(json!({
+                "model": model,
+                "temperature": 0.7,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": system
+                    },
+                    {
+                        "role": "user",
+                        "content": user_message
+                    }
+                ]
+            }));
 
         // Add optional headers for app tracking
         if let Some(name) = app_name {
@@ -239,26 +285,85 @@ impl LLMClient {
             request = request.header("HTTP-Referer", url);
         }
 
-        let response = request
-            .json(&request_body)
-            .send()
+        self.execute_request(request, &OpenAIParser, "OpenRouter")
             .await
-            .context("Failed to send request to OpenRouter API")?;
+    }
+}
 
-        let status = response.status();
-        let response_text = response.text().await?;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-        if !status.is_success() {
-            anyhow::bail!("OpenRouter API error ({}): {}", status, response_text);
-        }
+    #[test]
+    fn test_llm_request_builder() {
+        let request = LLMRequest::new("https://api.example.com")
+            .header("Authorization", "Bearer token")
+            .header("Custom-Header", "value")
+            .body(json!({"key": "value"}));
 
-        let openrouter_response: OpenAIResponse = serde_json::from_str(&response_text)
-            .context("Failed to parse OpenRouter response")?;
+        assert_eq!(request.url, "https://api.example.com");
+        assert_eq!(request.headers.len(), 2);
+        assert_eq!(request.headers[0].0, "Authorization");
+        assert_eq!(request.headers[0].1, "Bearer token");
+        assert_eq!(request.headers[1].0, "Custom-Header");
+        assert_eq!(request.headers[1].1, "value");
+        assert_eq!(request.body["key"], "value");
+    }
 
-        Ok(openrouter_response
-            .choices
-            .first()
-            .map(|c| c.message.content.clone())
-            .unwrap_or_default())
+    #[test]
+    fn test_anthropic_parser() {
+        let parser = AnthropicParser;
+        let response = r#"{"content": [{"text": "Hello, world!"}]}"#;
+        let result = parser.parse_completion(response).unwrap();
+        assert_eq!(result, "Hello, world!");
+    }
+
+    #[test]
+    fn test_anthropic_parser_empty_content() {
+        let parser = AnthropicParser;
+        let response = r#"{"content": []}"#;
+        let result = parser.parse_completion(response).unwrap();
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_anthropic_parser_invalid_json() {
+        let parser = AnthropicParser;
+        let response = "not valid json";
+        assert!(parser.parse_completion(response).is_err());
+    }
+
+    #[test]
+    fn test_openai_parser() {
+        let parser = OpenAIParser;
+        let response = r#"{"choices": [{"message": {"role": "assistant", "content": "Hello, world!"}}]}"#;
+        let result = parser.parse_completion(response).unwrap();
+        assert_eq!(result, "Hello, world!");
+    }
+
+    #[test]
+    fn test_openai_parser_empty_choices() {
+        let parser = OpenAIParser;
+        let response = r#"{"choices": []}"#;
+        let result = parser.parse_completion(response).unwrap();
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_openai_parser_invalid_json() {
+        let parser = OpenAIParser;
+        let response = "not valid json";
+        assert!(parser.parse_completion(response).is_err());
+    }
+
+    #[test]
+    fn test_llm_request_chaining() {
+        let request = LLMRequest::new("https://test.com")
+            .header("Header1", "Value1")
+            .body(json!({"test": true}))
+            .header("Header2", "Value2");
+
+        assert_eq!(request.headers.len(), 2);
+        assert!(request.body["test"].as_bool().unwrap());
     }
 }
